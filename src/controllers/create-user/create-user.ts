@@ -1,48 +1,37 @@
-import validar from "validator";
+import validator from "validator";
 import { User } from "../../models/user";
 import { HttpRequest, HttpResponse, IController } from "../protocols";
 import { CreateUserParams, ICreateUserRepository } from "./protocols";
+import { badRequest, created, serverError } from "../helpers";
 
 export class CreateUserController implements IController {
   constructor(private readonly createUserRepository: ICreateUserRepository) {}
 
   async handle(
-    HttpRequest: HttpRequest<CreateUserParams>
-  ): Promise<HttpResponse<User>> {
+    httpRequest: HttpRequest<CreateUserParams>
+  ): Promise<HttpResponse<User | string>> {
     try {
       const requiredFields = ["firstName", "lastName", "email", "password"];
 
       for (const field of requiredFields) {
-        if (!HttpRequest?.body?.[field as keyof CreateUserParams]?.length) {
-          return {
-            statusCode: 400,
-            body: `Field ${field} is required`,
-          };
+        if (!httpRequest?.body?.[field as keyof CreateUserParams]?.length) {
+          return badRequest(`Field ${field} is required`);
         }
       }
 
-      const emailIsValid = validar.isEmail(HttpRequest.body!.email);
-
-      const user = await this.createUserRepository.createUser(
-        HttpRequest.body!
-      );
+      const emailIsValid = validator.isEmail(httpRequest.body!.email);
 
       if (!emailIsValid) {
-        return {
-          statusCode: 400,
-          body: "E-mail is invalid!",
-        };
+        return badRequest("E-mail is invalid");
       }
 
-      return {
-        statusCode: 201,
-        body: user,
-      };
+      const user = await this.createUserRepository.createUser(
+        httpRequest.body!
+      );
+
+      return created<User>(user);
     } catch (error) {
-      return {
-        statusCode: 500,
-        body: "Something went wrong.",
-      };
+      return serverError();
     }
   }
 }
